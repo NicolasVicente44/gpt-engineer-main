@@ -1,0 +1,171 @@
+Core classes, functions, and methods:
+
+1. Model:
+- Snake: represents the snake in the game, with methods to move, grow, and check for collisions
+- Food: represents the food in the game, with methods to randomly place the food on the board
+- Board: represents the game board, with methods to update the board with the snake and food positions, and check for collisions
+
+2. View:
+- GameView: represents the game window, with methods to draw the board and snake on the screen, and update the score
+
+3. Controller:
+- GameController: handles user input and updates the game state accordingly
+
+4. Main:
+- main: initializes the game and starts the game loop
+
+File content:
+
+1. model.py
+```python
+from dataclasses import dataclass
+from typing import List, Tuple
+import random
+
+@dataclass
+class Snake:
+    body: List[Tuple[int, int]]
+    direction: Tuple[int, int]
+
+    def move(self):
+        head = self.body[0]
+        x, y = head[0] + self.direction[0], head[1] + self.direction[1]
+        self.body.insert(0, (x, y))
+        self.body.pop()
+
+    def grow(self):
+        tail = self.body[-1]
+        x, y = tail[0] - self.direction[0], tail[1] - self.direction[1]
+        self.body.append((x, y))
+
+    def check_collision(self, board_size):
+        head = self.body[0]
+        if head[0] < 0 or head[0] >= board_size[0] or head[1] < 0 or head[1] >= board_size[1]:
+            return True
+        if head in self.body[1:]:
+            return True
+        return False
+
+@dataclass
+class Food:
+    position: Tuple[int, int]
+
+    def place_food(self, board_size, snake_body):
+        while True:
+            x, y = random.randint(0, board_size[0]-1), random.randint(0, board_size[1]-1)
+            if (x, y) not in snake_body:
+                self.position = (x, y)
+                break
+
+class Board:
+    def __init__(self, size):
+        self.size = size
+        self.snake = Snake([(size[0]//2, size[1]//2)], (0, -1))
+        self.food = Food((0, 0))
+        self.food.place_food(size, self.snake.body)
+
+    def update(self):
+        self.snake.move()
+        if self.snake.body[0] == self.food.position:
+            self.snake.grow()
+            self.food.place_food(self.size, self.snake.body)
+
+    def check_collision(self):
+        return self.snake.check_collision(self.size)
+```
+
+2. view.py
+```python
+import pygame
+
+class GameView:
+    def __init__(self, board_size, block_size):
+        self.board_size = board_size
+        self.block_size = block_size
+        self.screen_size = (board_size[0]*block_size, board_size[1]*block_size)
+        self.screen = pygame.display.set_mode(self.screen_size)
+        self.font = pygame.font.SysFont('Arial', 30)
+
+    def draw_board(self, board):
+        self.screen.fill((255, 255, 255))
+        for i in range(self.board_size[0]):
+            for j in range(self.board_size[1]):
+                rect = pygame.Rect(i*self.block_size, j*self.block_size, self.block_size, self.block_size)
+                pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
+        self.draw_snake(board.snake.body)
+        self.draw_food(board.food.position)
+        pygame.display.update()
+
+    def draw_snake(self, snake_body):
+        for block in snake_body:
+            rect = pygame.Rect(block[0]*self.block_size, block[1]*self.block_size, self.block_size, self.block_size)
+            pygame.draw.rect(self.screen, (0, 255, 0), rect)
+
+    def draw_food(self, food_position):
+        rect = pygame.Rect(food_position[0]*self.block_size, food_position[1]*self.block_size, self.block_size, self.block_size)
+        pygame.draw.rect(self.screen, (255, 0, 0), rect)
+
+    def update_score(self, score):
+        text = self.font.render(f"Score: {score}", True, (0, 0, 0))
+        self.screen.blit(text, (10, 10))
+        pygame.display.update()
+```
+
+3. controller.py
+```python
+import pygame
+from pygame.locals import *
+from model import Board
+
+class GameController:
+    def __init__(self, board_size, block_size):
+        self.board_size = board_size
+        self.block_size = block_size
+        self.board = Board(board_size)
+        self.view = GameView(board_size, block_size)
+
+    def handle_events(self):
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                exit()
+            elif event.type == KEYDOWN:
+                if event.key == K_UP:
+                    self.board.snake.direction = (0, -1)
+                elif event.key == K_DOWN:
+                    self.board.snake.direction = (0, 1)
+                elif event.key == K_LEFT:
+                    self.board.snake.direction = (-1, 0)
+                elif event.key == K_RIGHT:
+                    self.board.snake.direction = (1, 0)
+
+    def run_game(self):
+        clock = pygame.time.Clock()
+        score = 0
+        while True:
+            self.handle_events()
+            self.board.update()
+            self.view.draw_board(self.board)
+            if self.board.check_collision():
+                pygame.quit()
+                exit()
+            score += 1
+            self.view.update_score(score)
+            clock.tick(10)
+```
+
+4. main.py
+```python
+import pygame
+from controller import GameController
+
+def main():
+    pygame.init()
+    board_size = (20, 20)
+    block_size = 20
+    game_controller = GameController(board_size, block_size)
+    game_controller.run_game()
+
+if __name__ == '__main__':
+    main()
+```
